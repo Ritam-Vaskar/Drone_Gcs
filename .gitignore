@@ -1,0 +1,7 @@
+/*************  ✨ Windsurf Command ⭐  *************/
+# Ignore local dev environment
+.venv
+.env
+node_modules
+dist
+/*******  196175d5-8871-4620-bd9b-2d9e4292c88f  *******/

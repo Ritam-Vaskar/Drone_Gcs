@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - SITL_ADDRESS=udp://:14540
+      - API_KEY=gcs-secret-key-2024
+    networks:
+      - gcs-network
+    depends_on:
+      - simulator
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000/ws
+    networks:
+      - gcs-network
+    depends_on:
+      - backend
+
+  simulator:
+    image: px4-sitl:latest  # Custom PX4 image
+    ports:
+      - "14540:14540/udp"
+    networks:
+      - gcs-network
+
+networks:
+  gcs-network:
+    driver: bridge
