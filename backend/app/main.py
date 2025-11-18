@@ -129,60 +129,64 @@ async def startup():
 # WebSocket endpoint for real-time telemetry
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    global telemetry_data
     await websocket.accept()
     ws_clients.add(websocket)
     logger.info(f"WebSocket client connected. Total: {len(ws_clients)}")
     
     try:
         while True:
-            # Fetch current telemetry
             try:
                 if is_connected:
-                    position = await drone.telemetry.position().__anext__()
-                    attitude = await drone.telemetry.attitude_euler().__anext__()
-                    velocity = await drone.telemetry.velocity_ned().__anext__()
-                    battery = await drone.telemetry.battery().__anext__()
-                    flight_mode = await drone.telemetry.flight_mode().__anext__()
-                    health = await drone.telemetry.health().__anext__()
-                    
-                    telemetry_data = {
-                        "timestamp": datetime.now().isoformat(),
-                        "connected": True,
-                        "position": {
-                            "lat": position.latitude_deg,
-                            "lon": position.longitude_deg,
-                            "relative_alt_m": position.relative_altitude_m,
-                            "absolute_alt_m": position.absolute_altitude_m
-                        },
-                        "attitude": {
-                            "roll_deg": attitude.roll_deg,
-                            "pitch_deg": attitude.pitch_deg,
-                            "yaw_deg": attitude.yaw_deg
-                        },
-                        "velocity": {
-                            "north_m_s": velocity.north_m_s,
-                            "east_m_s": velocity.east_m_s,
-                            "down_m_s": velocity.down_m_s
-                        },
-                        "battery": {
-                            "voltage_v": battery.voltage_v,
-                            "remaining_percent": battery.remaining_percent
-                        },
-                        "flight_mode": str(flight_mode),
-                        "health": {
-                            "is_gyrometer_calibration_ok": health.is_gyrometer_calibration_ok,
-                            "is_accelerometer_calibration_ok": health.is_accelerometer_calibration_ok,
-                            "is_magnetometer_calibration_ok": health.is_magnetometer_calibration_ok,
-                            "is_level_calibration_ok": health.is_level_calibration_ok,
-                            "is_local_position_ok": health.is_local_position_ok,
-                            "is_global_position_ok": health.is_global_position_ok,
-                            "is_home_position_ok": health.is_home_position_ok,
-                            "is_armable": health.is_armable
+                    # In mock mode, telemetry_data is already being updated by mock_telemetry_loop
+                    # In real mode, fetch from drone
+                    if not mock_mode:
+                        position = await drone.telemetry.position().__anext__()
+                        attitude = await drone.telemetry.attitude_euler().__anext__()
+                        velocity = await drone.telemetry.velocity_ned().__anext__()
+                        battery = await drone.telemetry.battery().__anext__()
+                        flight_mode = await drone.telemetry.flight_mode().__anext__()
+                        health = await drone.telemetry.health().__anext__()
+                        
+                        telemetry_data = {
+                            "timestamp": datetime.now().isoformat(),
+                            "connected": True,
+                            "position": {
+                                "lat": position.latitude_deg,
+                                "lon": position.longitude_deg,
+                                "relative_alt_m": position.relative_altitude_m,
+                                "absolute_alt_m": position.absolute_altitude_m
+                            },
+                            "attitude": {
+                                "roll_deg": attitude.roll_deg,
+                                "pitch_deg": attitude.pitch_deg,
+                                "yaw_deg": attitude.yaw_deg
+                            },
+                            "velocity": {
+                                "north_m_s": velocity.north_m_s,
+                                "east_m_s": velocity.east_m_s,
+                                "down_m_s": velocity.down_m_s
+                            },
+                            "battery": {
+                                "voltage_v": battery.voltage_v,
+                                "remaining_percent": battery.remaining_percent
+                            },
+                            "flight_mode": str(flight_mode),
+                            "health": {
+                                "is_gyrometer_calibration_ok": health.is_gyrometer_calibration_ok,
+                                "is_accelerometer_calibration_ok": health.is_accelerometer_calibration_ok,
+                                "is_magnetometer_calibration_ok": health.is_magnetometer_calibration_ok,
+                                "is_level_calibration_ok": health.is_level_calibration_ok,
+                                "is_local_position_ok": health.is_local_position_ok,
+                                "is_global_position_ok": health.is_global_position_ok,
+                                "is_home_position_ok": health.is_home_position_ok,
+                                "is_armable": health.is_armable
+                            }
                         }
-                    }
                     
-                    # Broadcast to all connected clients
-                    await websocket.send_text(json.dumps(telemetry_data))
+                    # Send telemetry (either from mock or real drone)
+                    if telemetry_data:
+                        await websocket.send_text(json.dumps(telemetry_data))
                 
                 await asyncio.sleep(0.1)
             except StopAsyncIteration:

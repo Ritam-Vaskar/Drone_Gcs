@@ -1,7 +1,53 @@
-/*************  ✨ Windsurf Command ⭐  *************/
-# Ignore local dev environment
+# Python
 .venv
+venv/
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info
+dist/
+build/
+.pytest_cache/
+
+# Environment variables
 .env
-node_modules
-dist
-/*******  196175d5-8871-4620-bd9b-2d9e4292c88f  *******/
+.env.local
+.env.*.local
+backend/.env
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# Next.js
+.next/
+out/
+dist/
+
+# Build outputs
+build/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+.coverage
+*.cover
+
+# Temporary files
+*.tmp
+*.bak
+*.cache

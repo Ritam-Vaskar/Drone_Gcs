@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import TelemetryPanel from "@/components/telemetry-panel"
 import DroneControls from "@/components/drone-controls"
 import ConnectionStatus from "@/components/connection-status"
+import VideoFeed from "@/components/video-feed"
 import { telemetryClient } from "@/services/ws"
 import { config } from "@/lib/config"
 
@@ -116,7 +117,14 @@ export default function DroneGCS() {
 
         {/* Dashboard Content */}
         <div className="flex-1 overflow-auto">
-          {activeSection === "telemetry" && <TelemetryPanel telemetry={telemetry} connected={connected} />}
+          {activeSection === "telemetry" && (
+            <div className="p-6">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <VideoFeed />
+                <TelemetryPanel telemetry={telemetry} connected={connected} />
+              </div>
+            </div>
+          )}
           {activeSection === "controls" && <DroneControls connected={connected} telemetry={telemetry} />}
           {activeSection === "systems" && (
             <div className="p-6">
