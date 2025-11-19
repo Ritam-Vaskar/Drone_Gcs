@@ -2,16 +2,37 @@
 
 import { useEffect, useRef, useState } from "react"
 import { Video, VideoOff } from "lucide-react"
+import { config } from "@/lib/config"
 
 export default function VideoFeed() {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const imgRef = useRef<HTMLImageElement>(null)
   const [isConnected, setIsConnected] = useState(false)
-  const [activeCamera, setActiveCamera] = useState<"fpv" | "follow" | "top">("fpv")
+  const [activeCamera, setActiveCamera] = useState<"front_center" | "bottom_center">("front_center")
 
   useEffect(() => {
-    // Placeholder for future WebRTC/RTSP stream connection
-    // This will connect to backend video stream endpoint when AirSim is integrated
-    setIsConnected(false)
+    // Check if AirSim video is available
+    fetch(`${config.apiUrl}/api/v1/video/status`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.connected && imgRef.current) {
+          // Set MJPEG stream as image source
+          imgRef.current.src = `${config.apiUrl}/api/v1/video/stream?t=${Date.now()}`
+          setIsConnected(true)
+        } else {
+          setIsConnected(false)
+          // Retry after 5 seconds
+          setTimeout(() => {
+            if (imgRef.current) {
+              imgRef.current.src = `${config.apiUrl}/api/v1/video/stream?t=${Date.now()}`
+            }
+          }, 5000)
+        }
+      })
+      .catch(err => {
+        console.error("Video status check failed:", err)
+        setIsConnected(false)
+      })
   }, [])
 
   return (
@@ -35,15 +56,14 @@ export default function VideoFeed() {
       </div>
 
       <div className="relative aspect-video bg-black rounded overflow-hidden border border-cyan-900/30">
-        {isConnected ? (
-          <video
-            ref={videoRef}
-            className="w-full h-full object-cover"
-            autoPlay
-            muted
-            playsInline
-          />
-        ) : (
+        {/* MJPEG stream as image */}
+        <img
+          ref={imgRef}
+          className={`w-full h-full object-cover ${isConnected ? "block" : "hidden"}`}
+          alt="Drone camera feed"
+        />
+        
+        {!isConnected && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
               <div className="text-cyan-900 mb-3">
@@ -89,49 +109,68 @@ export default function VideoFeed() {
       </div>
 
       {/* Camera controls */}
-      <div className="mt-3 grid grid-cols-3 gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-2">
         <button
-          onClick={() => setActiveCamera("fpv")}
+          onClick={async () => {
+            setActiveCamera("front_center")
+            try {
+              await fetch(`${config.apiUrl}/api/v1/video/camera/front_center`, { method: "POST" })
+              if (imgRef.current) {
+                imgRef.current.src = `${config.apiUrl}/api/v1/video/stream?t=${Date.now()}`
+              }
+            } catch (err) {
+              console.error("Failed to switch camera:", err)
+            }
+          }}
           disabled={!isConnected}
           className={`px-3 py-2 text-xs font-mono rounded border transition-colors ${
-            activeCamera === "fpv"
+            activeCamera === "front_center"
               ? "bg-cyan-600/50 border-cyan-600 text-cyan-300"
               : "bg-cyan-950/50 border-cyan-900/50 text-cyan-700 hover:border-cyan-700"
           } disabled:opacity-50 disabled:cursor-not-allowed`}
         >
-          FPV VIEW
+          📹 FPV (FRONT)
         </button>
         <button
-          onClick={() => setActiveCamera("follow")}
+          onClick={async () => {
+            setActiveCamera("bottom_center")
+            try {
+              await fetch(`${config.apiUrl}/api/v1/video/camera/bottom_center`, { method: "POST" })
+              if (imgRef.current) {
+                imgRef.current.src = `${config.apiUrl}/api/v1/video/stream?t=${Date.now()}`
+              }
+            } catch (err) {
+              console.error("Failed to switch camera:", err)
+            }
+          }}
           disabled={!isConnected}
           className={`px-3 py-2 text-xs font-mono rounded border transition-colors ${
-            activeCamera === "follow"
+            activeCamera === "bottom_center"
               ? "bg-cyan-600/50 border-cyan-600 text-cyan-300"
               : "bg-cyan-950/50 border-cyan-900/50 text-cyan-700 hover:border-cyan-700"
           } disabled:opacity-50 disabled:cursor-not-allowed`}
         >
-          FOLLOW VIEW
-        </button>
-        <button
-          onClick={() => setActiveCamera("top")}
-          disabled={!isConnected}
-          className={`px-3 py-2 text-xs font-mono rounded border transition-colors ${
-            activeCamera === "top"
-              ? "bg-cyan-600/50 border-cyan-600 text-cyan-300"
-              : "bg-cyan-950/50 border-cyan-900/50 text-cyan-700 hover:border-cyan-700"
-          } disabled:opacity-50 disabled:cursor-not-allowed`}
-        >
-          TOP VIEW
+          ⬇️ BOTTOM (LANDING)
         </button>
       </div>
 
       {/* Status info */}
-      <div className="mt-3 p-2 bg-yellow-950/30 border border-yellow-900/50 rounded">
-        <p className="text-yellow-700 text-xs font-mono">
-          ⚠ Camera feed requires AirSim simulator
+      <div className={`mt-3 p-2 border rounded ${
+        isConnected 
+          ? "bg-green-950/30 border-green-900/50" 
+          : "bg-yellow-950/30 border-yellow-900/50"
+      }`}>
+        <p className={`text-xs font-mono ${
+          isConnected ? "text-green-700" : "text-yellow-700"
+        }`}>
+          {isConnected 
+            ? "✅ AirSim Blocks connected - Streaming live video" 
+            : "⚠️  Start AirSim Blocks.exe for camera feed"}
         </p>
-        <p className="text-yellow-800 text-xs font-mono mt-1">
-          Currently showing telemetry from: {isConnected ? "AirSim" : "PX4 SITL"}
+        <p className={`text-xs font-mono mt-1 ${
+          isConnected ? "text-green-800" : "text-yellow-800"
+        }`}>
+          Telemetry source: PX4 SITL | Video: {isConnected ? "AirSim" : "Offline"}
         </p>
       </div>
     </div>

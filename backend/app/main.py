@@ -3,11 +3,12 @@ import json
 from datetime import datetime
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from mavsdk import System
 from mavsdk.action import ActionError
 import logging
 from app.config import MOCK_MODE, SITL_ADDRESS, API_KEY
+from app.video_stream import video_streamer
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -173,14 +174,13 @@ async def websocket_endpoint(websocket: WebSocket):
                             },
                             "flight_mode": str(flight_mode),
                             "health": {
-                                "is_gyrometer_calibration_ok": health.is_gyrometer_calibration_ok,
-                                "is_accelerometer_calibration_ok": health.is_accelerometer_calibration_ok,
-                                "is_magnetometer_calibration_ok": health.is_magnetometer_calibration_ok,
-                                "is_level_calibration_ok": health.is_level_calibration_ok,
-                                "is_local_position_ok": health.is_local_position_ok,
-                                "is_global_position_ok": health.is_global_position_ok,
-                                "is_home_position_ok": health.is_home_position_ok,
-                                "is_armable": health.is_armable
+                                "is_gyrometer_calibration_ok": getattr(health, 'is_gyrometer_calibration_ok', True),
+                                "is_accelerometer_calibration_ok": getattr(health, 'is_accelerometer_calibration_ok', True),
+                                "is_magnetometer_calibration_ok": getattr(health, 'is_magnetometer_calibration_ok', True),
+                                "is_local_position_ok": getattr(health, 'is_local_position_ok', True),
+                                "is_global_position_ok": getattr(health, 'is_global_position_ok', True),
+                                "is_home_position_ok": getattr(health, 'is_home_position_ok', True),
+                                "is_armable": getattr(health, 'is_armable', True)
                             }
                         }
                     
@@ -256,3 +256,48 @@ async def status():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+# Video streaming endpoints
+@app.get("/api/v1/video/stream")
+async def video_stream():
+    """MJPEG video stream from AirSim camera"""
+    if not video_streamer.is_connected:
+        await video_streamer.connect()
+    
+    if not video_streamer.is_connected:
+        return JSONResponse(
+            {"status": "error", "detail": "AirSim not connected. Start Blocks.exe first."},
+            status_code=503
+        )
+    
+    return StreamingResponse(
+        video_streamer.stream_generator(),
+        media_type="multipart/x-mixed-replace; boundary=frame"
+    )
+
+@app.get("/api/v1/video/status")
+async def video_status():
+    """Check if video stream is available"""
+    return {
+        "connected": video_streamer.is_connected,
+        "camera": video_streamer.camera_name
+    }
+
+@app.post("/api/v1/video/camera/{camera_name}")
+async def switch_camera(camera_name: str):
+    """Switch between cameras (front_center, bottom_center)"""
+    success = video_streamer.switch_camera(camera_name)
+    if success:
+        return {"status": "ok", "camera": camera_name}
+    return JSONResponse(
+        {"status": "error", "detail": "Invalid camera name"},
+        status_code=400
+    )
+
+# Startup event
+@app.on_event("startup")
+async def startup_event():
+    """Initialize drone and video connections on startup"""
+    asyncio.create_task(init_drone())
+    # Try to connect to AirSim (will log warning if not available)
+    asyncio.create_task(video_streamer.connect())

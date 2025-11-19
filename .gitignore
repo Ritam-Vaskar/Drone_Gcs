@@ -9,7 +9,7 @@ __pycache__/
 dist/
 build/
 .pytest_cache/
-
+Blocks
 # Environment variables
 .env
 .env.local
